@@ -10,10 +10,10 @@ typedef struct {
     pthread_t threads [THREADS_NUMBER];
     pthread_mutex_t mutex;
     pthread_cond_t cond_var;
+    bool ret;
 }threadPool;
 
-threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = PTHREAD_COND_INITIALIZER};  // init cond and mu later
-
+threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = PTHREAD_COND_INITIALIZER, .ret = false};
 
 typedef struct {
     void *func_ptr;
@@ -53,9 +53,7 @@ bool isEmpty(){
 }
 
 void *threadWait(void *args){
-
-    while (true) {
-
+    while (true && !pool.ret) {
         pthread_mutex_lock(&pool.mutex);
         while (isEmpty){
             pthread_cond_wait(&pool.cond_var,&pool.mutex);
@@ -68,7 +66,35 @@ void *threadWait(void *args){
 
         (*func)(NULL);  // when adding args this should not be null
     }
+}
 
+void threads_init(){
+    pthread_mutex_init(&pool.mutex,NULL);
+    pthread_cond_init(&pool.cond_var,NULL);
+
+    for (int i = 0; i < THREADS_NUMBER; i++){
+        if (pthread_create(pool.threads[i],NULL,threadWait,NULL) != 0){    //maybe add args later
+            //deal with error
+        } 
+
+    }
+}
+
+void threads_join(){
+    pthread_mutex_lock(&pool.mutex);
+    pool.ret = true;
+    pthread_mutex_unlock(&pool.mutex);
+
+    for (int i = 0; i < THREADS_NUMBER; i++){
+        if (pthread_join(pool.threads[i],NULL) != 0){
+            //deal with error
+        }
+    }
+}
+
+void threads_cleanup(){
+    pthread_mutex_destroy(&pool.mutex);
+    pthread_cond_destroy(&pool.cond_var);
 }
 
 void main (void){
