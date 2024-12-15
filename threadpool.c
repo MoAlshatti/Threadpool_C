@@ -6,7 +6,14 @@
 #include <stdbool.h>
 #define THREADS_NUMBER 4
 
-pthread_t threads [THREADS_NUMBER];
+typedef struct {
+    pthread_t threads [THREADS_NUMBER];
+    pthread_mutex_t mutex;
+    pthread_cond_t cond_var;
+}threadPool;
+
+threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = PTHREAD_COND_INITIALIZER};  // init cond and mu later
+
 
 typedef struct {
     void *func_ptr;
@@ -25,6 +32,10 @@ tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL};
 void EnqueueTask(task *task){
     taskQueue.rear->next = task;
     taskQueue.rear = task;
+
+    if (taskQueue.front == NULL){
+        taskQueue.front = task;
+    }
 }
 
 task *DequeueTask(){
@@ -39,6 +50,25 @@ bool isEmpty(){
     }  else {
         return false;
     }
+}
+
+void *threadWait(void *args){
+
+    while (true) {
+
+        pthread_mutex_lock(&pool.mutex);
+        while (isEmpty){
+            pthread_cond_wait(&pool.cond_var,&pool.mutex);
+        }
+
+        // call the function .... etc.
+        task *t = DequeueTask();
+
+        void* (*func) (void *) = t->func_ptr;
+
+        (*func)(NULL);  // when adding args this should not be null
+    }
+
 }
 
 void main (void){
