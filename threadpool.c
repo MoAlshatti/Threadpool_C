@@ -32,10 +32,11 @@ typedef struct {
 
 tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL, .size = 0};
 
-void EnqueueTask(void *func, void *args){
+int EnqueueTask(void *func, void *args){
     task *t = (task*)malloc(sizeof(task));
     if (t == NULL){
-        //deal with error
+        fprintf(stderr,"mallocing a task failed...\n");
+        return EXIT_FAILURE;
     }
     t->func_ptr = func;
     t->next = NULL;
@@ -49,6 +50,7 @@ void EnqueueTask(void *func, void *args){
     }
     taskQueue.size++;
     pthread_cond_signal(&pool.cond_var);
+    return EXIT_SUCCESS;
 }
 
 task* DequeueTask(){
@@ -85,16 +87,26 @@ void *threadWait(void *args){
     return NULL;
 }
 
-void threads_init(){
-    pthread_mutex_init(&pool.mutex,NULL);
-    pthread_cond_init(&pool.cond_var,NULL);
+int threads_init(){
+    int err = pthread_mutex_init(&pool.mutex,NULL);
+    if (err != 0){
+        fprintf(stderr,"failed to initialize mutex, quitting ...\n");
+        return EXIT_FAILURE;
+    }
+    err = pthread_cond_init(&pool.cond_var,NULL);
+    if (err != 0){
+        fprintf(stderr,"failed to initialize the condition variable, quitting ...\n");
+        return EXIT_FAILURE;
+    }
 
     for (int i = 0; i < THREADS_NUMBER; i++){
         if (pthread_create(&pool.threads[i],NULL,threadWait,NULL) != 0){
-            //deal with error
+            fprintf(stderr,"failed to create thread %d, quitting ...\n",i+1);
+            return EXIT_FAILURE;
         } 
 
     }
+    return EXIT_SUCCESS;
 }
 
 void threads_join(){
@@ -106,7 +118,7 @@ void threads_join(){
     
     for (int i = 0; i < THREADS_NUMBER; i++){
         if (pthread_join(pool.threads[i],NULL) != 0){
-            //deal with error
+            fprintf(stderr,"failed to join thread %d\n",i+1);
         }    
     }
 }
@@ -130,14 +142,22 @@ void* print_string(void *arg){
 }
 
 int main (void){
-    threads_init();
+    int err = threads_init();
+    if (err == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
 
     // add tasks
     EnqueueTask(print_hello,NULL);
     EnqueueTask(print_string,"wazzaz");
+    EnqueueTask(print_string,"wazzaz");
+    EnqueueTask(print_string,"wazzaz");
+    EnqueueTask(print_string,"wazzaz");
+    EnqueueTask(print_string,"wazzaz");
+
 
     //allow some time for tasks to finish
-    sleep(5);
+    sleep(3);
 
     // finish the program
     threads_join();
