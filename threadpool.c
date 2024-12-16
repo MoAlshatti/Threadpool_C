@@ -68,19 +68,14 @@ bool isEmpty(){
 }
 
 void *threadWait(void *args){
-    while (true && !pool.ret) {
+    while (true) {
         pthread_mutex_lock(&pool.mutex);
-        printf("mutex grabbed, line %d\n",__LINE__);
-        while (isEmpty()){
-            printf("queue is empty, line %d\n",__LINE__);
+        while (isEmpty() && !pool.ret){
             pthread_cond_wait(&pool.cond_var,&pool.mutex);
-            printf("thread is awake, line %d\n",__LINE__);
-            if (pool.ret) {
-                printf("ret val is true inside thread, line %d\n",__LINE__);
-                pthread_mutex_unlock(&pool.mutex);
-                printf("returned from the thread, line %d\n",__LINE__);
-                return NULL;
-            }
+        }
+        if (pool.ret){
+            pthread_mutex_unlock(&pool.mutex);
+            return NULL;
         }
 
         // call the function .... etc.
@@ -107,16 +102,14 @@ void threads_init(){
 void threads_join(){
     pthread_mutex_lock(&pool.mutex);
     pool.ret = true;
-    printf("ret val is true, line %d\n",__LINE__);
     pthread_mutex_unlock(&pool.mutex);
+
+    pthread_cond_broadcast(&pool.cond_var);
     
     for (int i = 0; i < THREADS_NUMBER; i++){
-        pthread_cond_broadcast(&pool.cond_var);
-        printf("broadcasted %d time, line %d\n",i,__LINE__);
         if (pthread_join(pool.threads[i],NULL) != 0){
             //deal with error
         }    
-        printf("joined %d\n",i);
     }
 }
 
