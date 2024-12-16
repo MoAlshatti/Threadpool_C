@@ -46,6 +46,7 @@ void EnqueueTask(void *func){   //could make it take args later
     if (taskQueue.front == NULL){
         taskQueue.front = t;
     }
+    pthread_cond_broadcast(&pool.cond_var);
 }
 
 void* DequeueTask(){
@@ -79,11 +80,9 @@ void *threadWait(void *args){
         }
 
         // call the function .... etc.
-        task *t = DequeueTask();
+        void* (*func)() = DequeueTask();
 
-        void* (*func) (void *) = t->func_ptr;
-
-        (*func)(NULL);  // when adding args this should not be null
+        (*func)();  // when adding args this should not be empty
     }
     return NULL;
 }
@@ -116,11 +115,19 @@ void threads_cleanup(){
     pthread_mutex_destroy(&pool.mutex);
     pthread_cond_destroy(&pool.cond_var);
 }
+//testing function
+void* print_hello(){
+    for(int i = 0; i < 5; i++){
+        printf("hello %d\n",i);
+    }
+    return NULL;
+}
 
 int main (void){
     threads_init();
 
     // add tasks
+    EnqueueTask(print_hello);
 
     // finish the program
     threads_join();
