@@ -15,11 +15,13 @@ typedef struct {
 
 threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = PTHREAD_COND_INITIALIZER, .ret = false};
 
-typedef struct {
+
+struct task{
     void *func_ptr;
     // args (add at some point)
-    task *next;
-}task;
+    struct task *next;
+};
+typedef struct task task;
 
 typedef struct {
     task *front;
@@ -53,10 +55,14 @@ bool isEmpty(){
 }
 
 void *threadWait(void *args){
-    while (true && !pool.ret) {
+    while (true) {
         pthread_mutex_lock(&pool.mutex);
-        while (isEmpty){
+        while (isEmpty()){
             pthread_cond_wait(&pool.cond_var,&pool.mutex);
+            if (pool.ret) {
+                pthread_mutex_unlock(&pool.mutex);
+                return NULL;
+            }
         }
 
         // call the function .... etc.
@@ -66,6 +72,7 @@ void *threadWait(void *args){
 
         (*func)(NULL);  // when adding args this should not be null
     }
+    return NULL;
 }
 
 void threads_init(){
@@ -73,7 +80,7 @@ void threads_init(){
     pthread_cond_init(&pool.cond_var,NULL);
 
     for (int i = 0; i < THREADS_NUMBER; i++){
-        if (pthread_create(pool.threads[i],NULL,threadWait,NULL) != 0){    //maybe add args later
+        if (pthread_create(&pool.threads[i],NULL,threadWait,NULL) != 0){    //maybe add args later
             //deal with error
         } 
 
@@ -84,11 +91,11 @@ void threads_join(){
     pthread_mutex_lock(&pool.mutex);
     pool.ret = true;
     pthread_mutex_unlock(&pool.mutex);
-
     for (int i = 0; i < THREADS_NUMBER; i++){
+        pthread_cond_broadcast(&pool.cond_var);
         if (pthread_join(pool.threads[i],NULL) != 0){
             //deal with error
-        }
+        }    
     }
 }
 
@@ -97,6 +104,13 @@ void threads_cleanup(){
     pthread_cond_destroy(&pool.cond_var);
 }
 
-void main (void){
-    
+int main (void){
+    threads_init();
+
+    // add tasks
+
+    // finish the program
+    threads_join();
+    threads_cleanup();
+    return EXIT_SUCCESS;
 }
