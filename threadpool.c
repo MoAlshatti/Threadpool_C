@@ -19,6 +19,7 @@ threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = P
 struct task{
     void *func_ptr;
     // args (add at some point)
+    void *args;
     struct task *next;
 };
 typedef struct task task;
@@ -32,7 +33,7 @@ typedef struct {
 
 tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL, .size = 0};
 
-void EnqueueTask(void *func){   //could make it take args later
+void EnqueueTask(void *func, void *args){   //could make it take args later
     task *t = (task*)malloc(sizeof(task));
     if (t == NULL){
         //deal with error
@@ -40,6 +41,7 @@ void EnqueueTask(void *func){   //could make it take args later
 
     t->func_ptr = func;
     t->next = NULL;
+    t->args = args;
     if (taskQueue.rear != NULL){
         taskQueue.rear->next = t;
     }
@@ -48,19 +50,20 @@ void EnqueueTask(void *func){   //could make it take args later
         taskQueue.front = t;
     }
     taskQueue.size++;
-    pthread_cond_broadcast(&pool.cond_var);
+    pthread_cond_signal(&pool.cond_var);
 }
 
-void* DequeueTask(){
+task* DequeueTask(){
     task *t = taskQueue.front;
-    void* func = t->func_ptr;
+    //void* func = t->func_ptr;
     taskQueue.front = taskQueue.front->next;
     if (taskQueue.front == NULL){
         taskQueue.rear = NULL;
     }
     taskQueue.size--;
-    free(t);
-    return func;
+    //free(t);
+    return t;
+    //return func;
 }
 
 bool isEmpty(){
@@ -79,10 +82,12 @@ void *threadWait(void *args){
         }
 
         // call the function .... etc.
-        void* (*func)() = DequeueTask();
-
-        (*func)();  // when adding args this should not be empty
+       // void* (*func)() = DequeueTask();
+       task *t = DequeueTask();
+       void* (*func)(void*) = t->func_ptr;
         pthread_mutex_unlock(&pool.mutex);
+        (*func)(t->args);  // when adding args this should not be empty
+        free(t);
     }
     return NULL;
 }
@@ -124,13 +129,25 @@ void* print_hello(){
     }
     return NULL;
 }
+//testing function
+void* print_string(void *arg){
+    char *s = (char*) arg;
+    printf("%s\n",s);
+    return NULL;
+}
 
 int main (void){
     threads_init();
 
     // add tasks
-    EnqueueTask(print_hello);
+    EnqueueTask(print_hello,NULL);
+    EnqueueTask(print_hello,NULL);
+    EnqueueTask(print_hello,NULL);
 
+    EnqueueTask(print_string,"wazzaz");
+
+    //allow some time for tasks to finish
+    sleep(5);
 
     // finish the program
     threads_join();
