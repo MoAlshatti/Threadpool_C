@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdbool.h>
+#define UNUSED(x) (void)(x)
 #define THREADS_NUMBER 4
 
 typedef struct {
@@ -17,7 +17,7 @@ threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = P
 
 
 struct task{
-    void *func_ptr;
+    void* (*func_ptr)(void*);
     void *args;
     struct task *next;
 };
@@ -32,7 +32,7 @@ typedef struct {
 
 tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL, .size = 0};
 
-int EnqueueTask(void *func, void *args){
+int EnqueueTask(void* (*func)(void*), void *args){
     task *t = (task*)malloc(sizeof(task));
     if (t == NULL){
         fprintf(stderr,"mallocing a task failed...\n");
@@ -53,7 +53,7 @@ int EnqueueTask(void *func, void *args){
     return EXIT_SUCCESS;
 }
 
-task* DequeueTask(){
+task* DequeueTask(void){
     task *t = taskQueue.front;
     taskQueue.front = taskQueue.front->next;
     if (taskQueue.front == NULL){
@@ -63,11 +63,12 @@ task* DequeueTask(){
     return t;
 }
 
-bool isEmpty(){
+bool isEmpty(void){
    return (taskQueue.size == 0);
 }
 
 void *threadWait(void *args){
+    UNUSED(args);
     while (true) {
         pthread_mutex_lock(&pool.mutex);
         while (isEmpty() && !pool.ret){
@@ -87,7 +88,7 @@ void *threadWait(void *args){
     return NULL;
 }
 
-int threads_init(){
+int threads_init(void){
     int err = pthread_mutex_init(&pool.mutex,NULL);
     if (err != 0){
         fprintf(stderr,"failed to initialize mutex, quitting ...\n");
@@ -109,7 +110,7 @@ int threads_init(){
     return EXIT_SUCCESS;
 }
 
-void threads_join(){
+void threads_join(void){
     pthread_mutex_lock(&pool.mutex);
     pool.ret = true;
     pthread_mutex_unlock(&pool.mutex);
@@ -123,12 +124,13 @@ void threads_join(){
     }
 }
 
-void threads_cleanup(){
+void threads_cleanup(void){
     pthread_mutex_destroy(&pool.mutex);
     pthread_cond_destroy(&pool.cond_var);
 }
 //testing function
-void* print_hello(){
+void* print_hello(void *arg){
+    UNUSED(arg);
     for(int i = 0; i < 5; i++){
         printf("hello %d\n",i);
     }
@@ -148,12 +150,12 @@ int main (void){
     }
 
     // add tasks
-    EnqueueTask(print_hello,NULL);
-    EnqueueTask(print_string,"wazzaz");
-    EnqueueTask(print_string,"wazzaz");
-    EnqueueTask(print_string,"wazzaz");
-    EnqueueTask(print_string,"wazzaz");
-    EnqueueTask(print_string,"wazzaz");
+    EnqueueTask(&print_hello,NULL);
+    EnqueueTask(&print_string,"wazzaz");
+    EnqueueTask(&print_string,"wazzaz");
+    EnqueueTask(&print_string,"wazzaz");
+    EnqueueTask(&print_string,"wazzaz");
+    EnqueueTask(&print_string,"wazzaz");
 
 
     //allow some time for tasks to finish
