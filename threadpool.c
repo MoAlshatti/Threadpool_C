@@ -26,10 +26,11 @@ typedef struct task task;
 typedef struct {
     task *front;
     task *rear;
+    size_t size;
 
 }tasksQue;
 
-tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL};
+tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL, .size = 0};
 
 void EnqueueTask(void *func){   //could make it take args later
     task *t = (task*)malloc(sizeof(task));
@@ -46,6 +47,7 @@ void EnqueueTask(void *func){   //could make it take args later
     if (taskQueue.front == NULL){
         taskQueue.front = t;
     }
+    taskQueue.size++;
     pthread_cond_broadcast(&pool.cond_var);
 }
 
@@ -56,25 +58,27 @@ void* DequeueTask(){
     if (taskQueue.front == NULL){
         taskQueue.rear = NULL;
     }
+    taskQueue.size--;
     free(t);
     return func;
 }
 
 bool isEmpty(){
-    if (taskQueue.front == NULL && taskQueue.rear == NULL){
-        return true;
-    }  else {
-        return false;
-    }
+   return (taskQueue.size == 0);
 }
 
 void *threadWait(void *args){
-    while (true) {
+    while (true && !pool.ret) {
         pthread_mutex_lock(&pool.mutex);
+        printf("mutex grabbed, line %d\n",__LINE__);
         while (isEmpty()){
+            printf("queue is empty, line %d\n",__LINE__);
             pthread_cond_wait(&pool.cond_var,&pool.mutex);
+            printf("thread is awake, line %d\n",__LINE__);
             if (pool.ret) {
+                printf("ret val is true inside thread, line %d\n",__LINE__);
                 pthread_mutex_unlock(&pool.mutex);
+                printf("returned from the thread, line %d\n",__LINE__);
                 return NULL;
             }
         }
@@ -83,6 +87,7 @@ void *threadWait(void *args){
         void* (*func)() = DequeueTask();
 
         (*func)();  // when adding args this should not be empty
+        pthread_mutex_unlock(&pool.mutex);
     }
     return NULL;
 }
@@ -102,12 +107,16 @@ void threads_init(){
 void threads_join(){
     pthread_mutex_lock(&pool.mutex);
     pool.ret = true;
+    printf("ret val is true, line %d\n",__LINE__);
     pthread_mutex_unlock(&pool.mutex);
+    
     for (int i = 0; i < THREADS_NUMBER; i++){
         pthread_cond_broadcast(&pool.cond_var);
+        printf("broadcasted %d time, line %d\n",i,__LINE__);
         if (pthread_join(pool.threads[i],NULL) != 0){
             //deal with error
         }    
+        printf("joined %d\n",i);
     }
 }
 
@@ -128,6 +137,7 @@ int main (void){
 
     // add tasks
     EnqueueTask(print_hello);
+
 
     // finish the program
     threads_join();
