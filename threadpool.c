@@ -18,7 +18,6 @@ threadPool pool = (threadPool){.mutex = PTHREAD_MUTEX_INITIALIZER, .cond_var = P
 
 struct task{
     void *func_ptr;
-    // args (add at some point)
     void *args;
     struct task *next;
 };
@@ -33,12 +32,11 @@ typedef struct {
 
 tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL, .size = 0};
 
-void EnqueueTask(void *func, void *args){   //could make it take args later
+void EnqueueTask(void *func, void *args){
     task *t = (task*)malloc(sizeof(task));
     if (t == NULL){
         //deal with error
     }
-
     t->func_ptr = func;
     t->next = NULL;
     t->args = args;
@@ -55,15 +53,12 @@ void EnqueueTask(void *func, void *args){   //could make it take args later
 
 task* DequeueTask(){
     task *t = taskQueue.front;
-    //void* func = t->func_ptr;
     taskQueue.front = taskQueue.front->next;
     if (taskQueue.front == NULL){
         taskQueue.rear = NULL;
     }
     taskQueue.size--;
-    //free(t);
     return t;
-    //return func;
 }
 
 bool isEmpty(){
@@ -80,13 +75,11 @@ void *threadWait(void *args){
             pthread_mutex_unlock(&pool.mutex);
             return NULL;
         }
-
-        // call the function .... etc.
-       // void* (*func)() = DequeueTask();
        task *t = DequeueTask();
        void* (*func)(void*) = t->func_ptr;
         pthread_mutex_unlock(&pool.mutex);
-        (*func)(t->args);  // when adding args this should not be empty
+
+        (*func)(t->args); 
         free(t);
     }
     return NULL;
@@ -97,7 +90,7 @@ void threads_init(){
     pthread_cond_init(&pool.cond_var,NULL);
 
     for (int i = 0; i < THREADS_NUMBER; i++){
-        if (pthread_create(&pool.threads[i],NULL,threadWait,NULL) != 0){    //maybe add args later
+        if (pthread_create(&pool.threads[i],NULL,threadWait,NULL) != 0){
             //deal with error
         } 
 
@@ -141,9 +134,6 @@ int main (void){
 
     // add tasks
     EnqueueTask(print_hello,NULL);
-    EnqueueTask(print_hello,NULL);
-    EnqueueTask(print_hello,NULL);
-
     EnqueueTask(print_string,"wazzaz");
 
     //allow some time for tasks to finish
