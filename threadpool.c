@@ -31,19 +31,32 @@ typedef struct {
 
 tasksQue taskQueue = (tasksQue) {.front = NULL, .rear = NULL};
 
-void EnqueueTask(task *task){
-    taskQueue.rear->next = task;
-    taskQueue.rear = task;
+void EnqueueTask(void *func){   //could make it take args later
+    task *t = (task*)malloc(sizeof(task));
+    if (t == NULL){
+        //deal with error
+    }
 
+    t->func_ptr = func;
+    t->next = NULL;
+    if (taskQueue.rear != NULL){
+        taskQueue.rear->next = t;
+    }
+    taskQueue.rear = t;
     if (taskQueue.front == NULL){
-        taskQueue.front = task;
+        taskQueue.front = t;
     }
 }
 
-task *DequeueTask(){
+void* DequeueTask(){
     task *t = taskQueue.front;
+    void* func = t->func_ptr;
     taskQueue.front = taskQueue.front->next;
-    return t;
+    if (taskQueue.front == NULL){
+        taskQueue.rear = NULL;
+    }
+    free(t);
+    return func;
 }
 
 bool isEmpty(){
